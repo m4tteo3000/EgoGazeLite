@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Experiments & checkpoints
+experiments/
+*.pt
+*.pth
+*.ckpt
+
+# Data & cache
+*.pkl
+*.cache
+*.h5
+*.hdf5
+data/frames_*/
+.cache/
+
+# Weights & Biases
+wandb/
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Misc
+*.log
+*.tmp
+
+# Internal utility scripts
+scripts/

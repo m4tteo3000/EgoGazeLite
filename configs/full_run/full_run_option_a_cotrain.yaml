@@ -1,0 +1,80 @@
+# Ego-Exo-4D full run - Stage 3 CO-TRAINING variant.
+# Identical to full_run_option_a.yaml except:
+#   - stage3.cotrain_attention: true   → unfreezes channel_weight_extractor,
+#                                          lstm_gated, attention_weight_app
+#   - stage3.attention_lr: 1.0e-5      → lower lr for the (already-trained)
+#                                          attention path
+#   - stage3.lr: 1.0e-4                → higher lr for the freshly-init fusion
+#                                          module
+#   - training.use_amp: false          → cuDNN LSTM + AMP + grad = pain,
+#                                          and Stage 3 is mostly cheap conv
+#                                          work anyway, so the speed cost is small
+#
+# Use: start from a Stage 2 checkpoint so the attention path starts warm:
+#   python train.py --config configs/full_run/full_run_option_a_cotrain.yaml \
+#       --resume experiments/full_run_egoexo_option_a_cotrain_v1/checkpoint_stage2_best.pt \
+#       --stage 3
+
+project_name: "ego-exo-gaze"
+run_name:     "full_run_egoexo_option_a_cotrain_v1"
+
+# ── Data ───────────────────────────────────────────────────────────────────────
+data_root:   "/path/to/EgoExo4D"
+splits_json: "configs/egoexo4d_splits.json"
+option:      "a"
+cache_dir:   "/path/to/EgoExo4D/.cache"
+# Pre-extracted 300x300 JPGs ({frames_dir}/{take_name}/frame_{idx:06d}.jpg).
+# null = decode frames on the fly from the mp4s (slower, no preprocessing).
+# Note: if set, samples whose frames are missing on disk are dropped.
+frames_dir:  null
+
+checkpoint_dir: "experiments/full_run_egoexo_option_a_cotrain_v1"
+
+camera_fov: 78
+
+seed:            42
+device:          "cuda"
+num_workers:     16
+sample_fraction:     1.0
+val_sample_fraction: 0.2
+
+torch_compile: true
+bptt_window:   64
+
+training:
+  use_amp:          false      # off for cotrain: LSTM + fp16 = unstable grads
+  grad_accum_steps: 8
+
+
+stage1:
+  epochs:            20
+  lr:                3.0e-5
+  batch_size:        16
+  patience:          5
+  backbone_freeze:   "all_except_last"
+  loss_function:     "bce_logits"
+  center_bias_sigma: 0.4
+
+stage2:
+  epochs:     15
+  lr:         1.0e-4
+  batch_size: 1
+  patience:   5
+
+stage3:
+  epochs:            20
+  lr:                1.0e-4       # fusion module 
+  attention_lr:      1.0e-5       # attention path 
+  patience:          5
+  fusion_mode:       "residual"   
+  cotrain_attention: true         # the key flag
+
+wandb:
+  enabled:                true
+  project:                "ego-exo-gaze"
+  entity:                 null
+  log_gradients:          false
+  log_weights:            false
+  log_freq:               50
+  log_predictions:        true
+  num_prediction_samples: 4
