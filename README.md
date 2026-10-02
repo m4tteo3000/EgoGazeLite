@@ -2,7 +2,7 @@
 
 ### EgoGazeLite: On-Device Egocentric Gaze Prediction for Token-Efficient Multimodal LLM Video Input
 
-#### Matteo Stoiber, Niels Buus Lassen (Copenhagen Business School) | [[Paper](https://arxiv.org/abs/2608.15614)]
+#### Matteo Stoiber, Niels Buus Lassen | [[Paper](https://arxiv.org/abs/2608.15614)]
 
 ---
 
