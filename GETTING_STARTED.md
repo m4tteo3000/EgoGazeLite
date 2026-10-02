@@ -27,7 +27,7 @@ python data/preprocessing_metadata_only.py \
 
 ## Step 2: Configure
 
-Open `configs/full_run/full_run_option_b_cotrain.yaml` and update the paths for your machine:
+Open `configs/full_run/full_run_option_a_cotrain.yaml` (Option A, the setup used in the paper) and update the paths for your machine:
 
 ```yaml
 data_root:   "/path/to/EgoExo4D"
@@ -42,18 +42,18 @@ frames_dir:  null   # or a folder of pre-extracted frames (see comment in the co
 Training runs all three stages sequentially:
 
 - **Stage 1** — Saliency decoder (EfficientNet-Lite4 backbone + temporal difference + decoder)
-- **Stage 2** — Attention transition (velocity-based fixation detection + LSTM)
-- **Stage 3** — Gated fusion (residual fusion of both pathways)
+- **Stage 2** — Attention transition (I-DT fixation detection + two-layer LSTM)
+- **Stage 3** — Residual fusion of both pathways
 
 ```bash
-python train.py --config configs/full_run/full_run_option_b_cotrain.yaml
+python train.py --config configs/full_run/full_run_option_a_cotrain.yaml
 ```
 
-Checkpoints are saved to the config's `checkpoint_dir` (`experiments/full_run_egoexo_option_b_cotrain_v1/`). To resume from a checkpoint:
+Checkpoints are saved to the config's `checkpoint_dir` (`experiments/full_run_egoexo_option_a_cotrain_v1/`). To resume from a checkpoint:
 
 ```bash
-python train.py --config configs/full_run/full_run_option_b_cotrain.yaml \
-    --resume experiments/full_run_egoexo_option_b_cotrain_v1/checkpoint_stage2_best.pt \
+python train.py --config configs/full_run/full_run_option_a_cotrain.yaml \
+    --resume experiments/full_run_egoexo_option_a_cotrain_v1/checkpoint_stage2_best.pt \
     --stage 3
 ```
 
@@ -63,24 +63,37 @@ Training logs to Weights & Biases by default. Set `wandb: {enabled: false}` in t
 
 ```bash
 python evaluate.py \
-    --checkpoint experiments/full_run_egoexo_option_b_cotrain_v1/checkpoint_final.pt \
+    --checkpoint experiments/full_run_egoexo_option_a_cotrain_v1/checkpoint_final.pt \
     --data_root  /path/to/EgoExo4D \
     --cache_dir  /path/to/EgoExo4D/.cache \
-    --option     b
+    --option     a
 ```
 
 For held-out evaluation on the generalization split (Basketball), add `--split generalization_test`.
 
 ## Expected results
 
-Results on GTEA Gaze+ (OP02 held-out subject, 30,344 frames):
+In-distribution results on the Ego-Exo4D validation set for the Option A checkpoint (from the paper):
 
-| Model | AUC | AAE_CoM (°) | Pixel Dist. | Params | GFLOPs | MPS FPS | iPhone 15 Pro NE FPS |
-|-------|-----|------------|-------------|--------|--------|---------|----------------------|
-| EgoGazeLite | **0.9592** | 5.97 | **29.17** | **15.7M** | **6.71** | **30** | **216** |
-| Huang et al. (2018) | 0.957 | **4.0** | — | 50.4M | 95.2 | 19 | 48 |
-| Lai et al. (2023) | 0.9434 | 6.85 | 33.46 | 70.4M | 57.1 | 1.3 | — ¹ |
+| Domain | AUC | AAE (°) | Pixel Dist. |
+|--------|-----|---------|-------------|
+| Cooking | 0.9705 | 7.58 | 24.46 |
+| Soccer | 0.9702 | 7.67 | 23.68 |
+| Health | 0.9684 | 7.73 | 25.51 |
+| Bike Repair | 0.9668 | 8.03 | 25.76 |
+| Dance | 0.9587 | 9.34 | 28.97 |
+| Bouldering | 0.9566 | 9.64 | 30.16 |
+| Music | 0.9545 | 10.23 | 30.76 |
+| **Overall** | **0.9655** | **8.33** | **26.35** |
 
-¹ Lai et al. (2023) could not be converted to CoreML (unsupported op: `upsample_trilinear3d`).
+Model capacity compared with prior dual-process and transformer gaze models:
 
-*Full results and ablations in the paper.*
+| Model | Params | GFLOPs |
+|-------|--------|--------|
+| EgoGazeLite | **15.7M** | **6.71** |
+| Huang et al. (2018) | 51.0M | 57.76 |
+| Lai et al. (2023) | 70.2M | 94.22 |
+
+On an iPhone 15 Pro, the full gaze-and-crop pipeline takes 21.6 ms per frame end-to-end (≈46 FPS, P95 30.8 ms), of which the EgoGazeLite forward pass on the Neural Engine takes 8.9 ms.
+
+*Downstream MLLM description-quality results are in the [paper](https://arxiv.org/abs/2608.15614).*

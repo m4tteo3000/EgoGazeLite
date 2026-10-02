@@ -43,7 +43,7 @@ The pre-generated splits file (`configs/egoexo4d_splits.json`) defines four subs
 | `downstream_test` | 138 takes for downstream evaluation |
 
 Two data tiers are available:
-- **Option A** — ~4h per domain (~28h total)
-- **Option B** — ~10h per domain (~68h total, default)
+- **Option A** — ~4h per domain (~28h total; used in the paper)
+- **Option B** — ~10h per domain (~68h total; no meaningful in-distribution gain over Option A)
 
 To regenerate splits from scratch, see `data/generate_split.py`.

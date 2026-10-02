@@ -1,8 +1,8 @@
-# EgoGazeLite: Lightweight Egocentric Gaze Prediction
+# EgoGazeLite
 
-### Look, No Eye-Tracker! Predicting Gaze for Video Cropping in Multimodal LLMs
+### EgoGazeLite: On-Device Egocentric Gaze Prediction for Token-Efficient Multimodal LLM Video Input
 
-#### Matteo Stoiber | [[Paper](https://arxiv.org/abs/2608.15614)]
+#### Matteo Stoiber, Niels Buus Lassen (Copenhagen Business School) | [[Paper](https://arxiv.org/abs/2608.15614)]
 
 ---
 
@@ -23,16 +23,18 @@
 
 ## Introduction
 
-EgoGazeLite is a lightweight CNN-LSTM architecture for egocentric gaze prediction that eliminates the need for eye-tracking hardware. It preserves the dual-process structure of prior work (bottom-up saliency path and top-down attention transition path) while replacing heavier components with efficient alternatives:
+EgoGazeLite is a lightweight dual-process gaze predictor for egocentric video. It replaces dedicated eye-tracking hardware so that egocentric video can be cropped around the predicted gaze before it is passed to a multimodal LLM, which cuts the number of visual tokens (as in [GazeLLM](https://arxiv.org/abs/2504.00221)). Across two MLLMs, three automated metrics and two LLM judges, crops around predicted gaze show no significant difference from crops around ground-truth gaze.
+
+The model preserves the dual-process structure of prior work (bottom-up saliency path and top-down attention transition path) while replacing heavier components with efficient alternatives:
 
 - **EfficientNet-Lite4 backbone** instead of VGG16
-- **Temporal frame differencing** instead of optical flow (no preprocessing required)
-- **LSTM-gated attention transition** with velocity-based fixation detection
-- **Residual gated fusion** combining both pathways
+- **Feature-level temporal difference** instead of dense optical flow (no preprocessing required)
+- **LSTM-gated attention transition** with online I-DT (dispersion-threshold) fixation detection
+- **Residual fusion** combining both pathways
 
 ![Architecture](assets/method.png)
 
-EgoGazeLite uses **15.7M parameters**, requires **6.71 GFLOPs per frame**, and runs at **30 FPS** on Apple Silicon MPS and **216 FPS** on iPhone 15 Pro Neural Engine. It is 3.2× smaller than Huang et al. (2018) and 4.5× smaller than Lai et al. (2023) in parameter count, while outperforming both on AUC. Lai et al. (2023) could not be converted to CoreML for mobile benchmarking (unsupported op).
+EgoGazeLite uses **15.7M parameters** and **6.71 GFLOPs** per frame, 3.2× fewer parameters than Huang et al. (2018) and 4.5× fewer than Lai et al. (2023), and an 8.6× and 14× reduction in FLOPs respectively. On an iPhone 15 Pro, the full gaze-and-crop pipeline runs end-to-end in **21.6 ms per frame** (≈46 FPS); the EgoGazeLite forward pass on the Neural Engine accounts for 8.9 ms of that.
 
 ## Installation
 
@@ -60,11 +62,11 @@ Training proceeds in three stages: saliency decoder → attention transition →
 
 ```bash
 # Train all three stages from scratch
-python train.py --config configs/full_run/full_run_option_b_cotrain.yaml
+python train.py --config configs/full_run/full_run_option_a_cotrain.yaml
 
 # Resume from a checkpoint at a specific stage
-python train.py --config configs/full_run/full_run_option_b_cotrain.yaml \
-    --resume experiments/full_run_egoexo_option_b_cotrain_v1/checkpoint_stage1_best.pt --stage 2
+python train.py --config configs/full_run/full_run_option_a_cotrain.yaml \
+    --resume experiments/full_run_egoexo_option_a_cotrain_v1/checkpoint_stage1_best.pt --stage 2
 ```
 
 See [GETTING_STARTED.md](GETTING_STARTED.md) for a full step-by-step walkthrough including config options.
@@ -73,45 +75,41 @@ See [GETTING_STARTED.md](GETTING_STARTED.md) for a full step-by-step walkthrough
 
 | Config | Training data |
 |--------|--------------|
-| `configs/full_run/full_run_option_b_cotrain.yaml` | Option B (~68h, default) |
-| `configs/full_run/full_run_option_a_cotrain.yaml` | Option A (~28h) |
+| `configs/full_run/full_run_option_a_cotrain.yaml` | Option A (~4h per domain, ~28h total; used in the paper) |
+| `configs/full_run/full_run_option_b_cotrain.yaml` | Option B (~10h per domain; no meaningful in-distribution gain) |
 
 ## Evaluation
 
 ```bash
 python evaluate.py \
-    --checkpoint experiments/full_run_egoexo_option_b_cotrain_v1/checkpoint_final.pt \
+    --checkpoint experiments/full_run_egoexo_option_a_cotrain_v1/checkpoint_final.pt \
     --data_root  /path/to/EgoExo4D \
     --cache_dir  /path/to/EgoExo4D/.cache \
-    --option     b
+    --option     a
 ```
 
-Use `--option a` for Option A checkpoints and `--split generalization_test` for the held-out Basketball domain. Reported metrics: AUC, AAE (°), Pixel Distance, NSS, parameters, GFLOPs, FPS.
+Use `--option b` for Option B checkpoints and `--split generalization_test` for the held-out Basketball domain. Reported metrics: AUC, AAE (°), Pixel Distance, NSS, parameters, GFLOPs, FPS.
 
 ## Pretrained Weights
 
-Evaluated on the Ego-Exo4D in-distribution validation set (AAE reported as AAE_argmax):
+Evaluated on the Ego-Exo4D in-distribution validation set (seven training domains; Basketball is held out). AAE is reported as AAE_argmax. The Option A checkpoint is the one reported in the paper.
 
 | Checkpoint | Dataset | AUC | AAE (°) | Pixel dist. | Download |
 |-----------|---------|-----|---------|-------------|----------|
 | EgoGazeLite-EgoExo4D-A | Ego-Exo4D Option A | 0.9655 | 8.33 | 26.35 | [download](https://huggingface.co/m4tteo3000/EgoGazeLite/resolve/main/egogazelite_option_a.pt) |
 | EgoGazeLite-EgoExo4D-B | Ego-Exo4D Option B | 0.9644 | 8.25 | 26.44 | [download](https://huggingface.co/m4tteo3000/EgoGazeLite/resolve/main/egogazelite_option_b.pt) |
 
-For cross-dataset comparison on GTEA Gaze+ (OP02, 30,344 frames):
-
-| Checkpoint | Dataset | AUC | AAE_CoM (°) | Pixel dist. |
-|-----------|---------|-----|------------|-------------|
-| EgoGazeLite-GTEA | GTEA Gaze+ | 0.9592 | 5.97 | 29.17 |
 
 ## Citation
 
 If you find this work useful, please cite:
 
 ```bibtex
-@article{stoiber2026egogaze,
-  title  = {Look, No Eye-Tracker! Predicting Gaze for Video Cropping in Multimodal LLMs},
-  author = {Stoiber, Matteo},
-  year   = {2026}
+@article{stoiber2026egogazelite,
+  title   = {EgoGazeLite: On-Device Egocentric Gaze Prediction for Token-Efficient Multimodal LLM Video Input},
+  author  = {Stoiber, Matteo and Lassen, Niels Buus},
+  journal = {arXiv preprint arXiv:2608.15614},
+  year    = {2026}
 }
 ```
 
